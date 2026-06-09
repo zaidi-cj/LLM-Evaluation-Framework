@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antigravity Eval - LLM Evaluation Dashboard</title>
+  <!-- Chart.js for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons for premium UI look -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+    :root {
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-heading: 'Outfit', sans-serif;
+
+      --bg-main: #060814;
+      --bg-surface: rgba(15, 22, 42, 0.65);
+      --bg-surface-hover: rgba(23, 33, 61, 0.8);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-primary: #3b82f6;
+      --accent-secondary: #8b5cf6;
+      
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-info: #06b6d4;
+
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.04) 0%, transparent 45%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.04) 0%, transparent 45%);
+      background-attachment: fixed;
+      display: flex;
+    }
+
+    /* Sidebar */
+    aside {
+      width: 260px;
+      background: rgba(6, 8, 20, 0.95);
+      border-right: 1px solid var(--border-color);
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      z-index: 10;
+    }
+
+    /* Main Panel */
+    main {
+      flex: 1;
+      margin-left: 260px;
+      padding: 40px;
+      max-width: 1250px;
+      width: calc(100% - 260px);
+    }
+
+    .glass-card {
+      background: var(--bg-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      transition: var(--transition-smooth);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+      margin-bottom: 25px;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(59, 130, 246, 0.2);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-heading);
+      letter-spacing: -0.02em;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+      outline: none;
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid transparent;
+    }
+    .badge-completed {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--color-success);
+      border-color: rgba(16, 185, 129, 0.2);
+    }
+    .badge-running {
+      background: rgba(6, 182, 212, 0.1);
+      color: var(--color-info);
+      border-color: rgba(6, 182, 212, 0.2);
+    }
+    .badge-failed {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .form-input, .form-textarea, .form-select {
+      width: 100%;
+      background: rgba(10, 15, 30, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      transition: var(--transition-smooth);
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--accent-primary);
+      outline: none;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    td {
+      padding: 16px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      font-size: 0.9rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      margin-bottom: 5px;
+      transition: var(--transition-smooth);
+    }
+    .nav-item:hover, .nav-item.active {
+      color: var(--text-primary);
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.15);
+    }
+
+    /* Trend Chart Container */
+    #chart-wrapper {
+      min-height: 250px;
+      position: relative;
+    }
+
+    /* Collapsible Result Details */
+    .result-details {
+      display: none;
+      background: rgba(5,8,20,0.5);
+      border-top: 1px solid var(--border-color);
+      padding: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside>
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 35px;">
+      <i data-lucide="award" style="color: var(--accent-primary)"></i>
+      <h2 style="font-size: 1.2rem; font-weight: 700;">Antigravity Eval</h2>
+    </div>
+
+    <div style="flex: 1;">
+      <div class="nav-item active" onclick="showSection('home')">
+        <i data-lucide="layout-dashboard" size="18"></i>
+        <span>Home Dashboard</span>
+      </div>
+
+      <div style="margin: 20px 0 10px 5px; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">
+        Active Projects
+      </div>
+      <div id="sidebar-projects-list"></div>
+    </div>
+
+    <div style="border-top: 1px solid var(--border-color); padding-top: 15px; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); display: inline-block;"></span>
+      <span>SQLite Local Live</span>
+    </div>
+  </aside>
+
+  <!-- MAIN WINDOW -->
+  <main>
+
+    <!-- SECTION 1: HOME PAGE -->
+    <div id="section-home">
+      <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 35px;">
+        <div>
+          <h1 style="font-size: 2.1rem; background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Evaluation Hub</h1>
+          <p style="color: var(--text-secondary); margin-top: 4px;">Run LLM benchmarks, monitor prompt regressions, and analyze drift.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('create-project-modal')">
+          <i data-lucide="plus" size="16"></i><span>New Project</span>
+        </button>
+      </header>
+
+      <!-- Overview Cards -->
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 35px;">
+        <div class="glass-card" style="margin-bottom: 0;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Projects</span>
+          <h2 style="font-size: 2rem; margin-top: 5px;" id="stat-projects">0</h2>
+        </div>
+        <div class="glass-card" style="margin-bottom: 0;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Runs</span>
+          <h2 style="font-size: 2rem; margin-top: 5px;" id="stat-runs">0</h2>
+        </div>
+        <div class="glass-card" style="margin-bottom: 0;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Cumulative Cost</span>
+          <h2 style="font-size: 2rem; margin-top: 5px; color: var(--color-success);" id="stat-cost">$0.00</h2>
+        </div>
+      </section>
+
+      <!-- Projects Grid -->
+      <h2 style="font-size: 1.3rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="folder-open" size="18" style="color: var(--accent-primary)"></i>
+        <span>Benchmarks Configuration</span>
+      </h2>
+      <div id="projects-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;"></div>
+    </div>
+
+    <!-- SECTION 2: PROJECT WORKSPACE -->
+    <div id="section-project" style="display: none;">
+      <header style="margin-bottom: 35px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <span class="badge" id="project-type-badge" style="background: rgba(139,92,246,0.12); color: var(--accent-secondary)">SQL</span>
+            <h1 style="font-size: 2.1rem; margin-top: 10px;" id="project-title">Project Title</h1>
+            <p style="color: var(--text-secondary); margin-top: 4px;" id="project-desc">Description</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="openModal('upload-cases-modal')">
+              <i data-lucide="upload" size="16"></i><span>Bulk Upload</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-delete-project" style="color: var(--color-danger); border-color: rgba(239,68,68,0.2)">
+              <i data-lucide="trash" size="16"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Action Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 35px;">
+        <!-- Run Form -->
+        <div class="glass-card" style="margin-bottom: 0;">
+          <h3 style="font-size: 1.15rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="play-circle" style="color: var(--accent-primary)"></i><span>Launch Evaluation</span>
+          </h3>
+          <form id="run-trigger-form">
+            <div class="form-group">
+              <label class="form-label">Target Model</label>
+              <select class="form-select" id="run-model" required>
+                <option value="mock/gemini-1.5-flash">Mock Gemini 1.5 (Instant & Offline)</option>
+                <option value="mock/gpt-4o">Mock GPT-4o (Instant & Offline)</option>
+                <option value="gemini/gemini-1.5-flash">Gemini 1.5 Flash</option>
+                <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+                <option value="openai/gpt-4o">GPT-4o</option>
+                <option value="anthropic/claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                <option value="ollama/llama3">Local Llama 3 (Ollama)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Temperature</label>
+              <input type="number" class="form-input" id="run-temp" value="0.0" min="0" max="1" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">System Prompt / Instruction Template</label>
+              <textarea class="form-textarea" id="run-prompt" rows="3" placeholder="Instruct system behavior..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%">
+              <i data-lucide="play" size="16"></i><span>Run Evaluation</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Drift Chart -->
+        <div class="glass-card" style="margin-bottom: 0; display: flex; flex-direction: column;">
+          <h3 style="font-size: 1.15rem; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="trending-up" style="color: var(--accent-secondary)"></i><span>Metric Drift Trend</span>
+          </h3>
+          <div id="chart-wrapper" style="flex: 1;">
+            <canvas id="driftChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run History -->
+      <section class="glass-card">
+        <h3 style="font-size: 1.15rem; margin-bottom: 20px;">Evaluation Runs</h3>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Success Rate</th>
+                <th>Latency</th>
+                <th>Cost</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="project-runs-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- SECTION 3: RUN DETAILS -->
+    <div id="section-run" style="display: none;">
+      <header style="margin-bottom: 30px;">
+        <span onclick="goBackToProject()" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+          <i data-lucide="arrow-left" size="16"></i><span>Back to Project</span>
+        </span>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 style="font-size: 2rem;">Run Metrics Breakdown</h1>
+            <p style="color: var(--text-secondary); margin-top: 4px;" id="run-details-header"></p>
+          </div>
+          <span class="badge badge-completed">Completed</span>
+        </div>
+      </header>
+
+      <!-- Stat Cards -->
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;" id="run-stats-grid"></section>
+
+      <!-- Regressions -->
+      <section class="glass-card" id="run-regressions-section" style="display: none; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.01)">
+        <h3 style="font-size: 1.15rem; color: #fca5a5; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="alert-triangle" style="color: var(--color-danger)"></i><span>Regression Alerts</span>
+        </h3>
+        <div id="run-regressions-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+      </section>
+
+      <!-- Result Explorer -->
+      <section class="glass-card">
+        <h3 style="font-size: 1.15rem; margin-bottom: 20px;">Outputs Explorer</h3>
+        <div id="run-results-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- MODAL: CREATE PROJECT -->
+  <div class="modal-overlay" id="create-project-modal">
+    <div class="glass-card" style="width: 90%; max-width: 480px;">
+      <h3 style="font-size: 1.25rem; margin-bottom: 20px;">New Evaluation Benchmark</h3>
+      <form id="create-project-form">
+        <div class="form-group">
+          <label class="form-label">Project Name</label>
+          <input type="text" class="form-input" id="new-proj-name" required placeholder="e.g. SQL Agent Benchmark">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="new-proj-desc" rows="3" placeholder="Brief explanation of test cases..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Benchmark Domain Type</label>
+          <select class="form-select" id="new-proj-type">
+            <option value="RAG">RAG (Retrieval Grounding & Relevance)</option>
+            <option value="SQL">SQL (In-memory DB Execution Check)</option>
+            <option value="CODE">CODE (Restricted Sandbox Testcases)</option>
+            <option value="SUMMARIZATION">SUMMARIZATION (Text Overlap & LLM Judge)</option>
+            <option value="GENERAL">GENERAL (General Instruction-Following)</option>
+          </select>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('create-project-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: UPLOAD TEST CASES -->
+  <div class="modal-overlay" id="upload-cases-modal">
+    <div class="glass-card" style="width: 95%; max-width: 580px;">
+      <h3 style="font-size: 1.25rem; margin-bottom: 15px;">Batch Upload Test Cases</h3>
+      <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px;">
+        Provide a JSON list of cases containing <strong>input_query</strong>, and optional <strong>expected_output</strong> or <strong>context_references</strong>.
+      </p>
+      <form id="upload-cases-form">
+        <div class="form-group">
+          <textarea class="form-textarea" id="upload-json-input" rows="10" style="font-family: monospace; font-size: 0.8rem;" required placeholder='[
+  {
+    "input_query": "What is the capital of France?",
+    "expected_output": "Paris"
+  }
+]'></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('upload-cases-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload JSON</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    const API_BASE = ""; // Connect relative since it's served on the same host
+    let currentProjectId = null;
+    let currentProject = null;
+    let chartInstance = null;
+
+    // Load home page list on start
+    window.onload = () => {
+      loadProjects();
+      lucide.createIcons();
+    };
+
+    function showSection(section) {
+      document.getElementById("section-home").style.display = section === "home" ? "block" : "none";
+      document.getElementById("section-project").style.display = section === "project" ? "block" : "none";
+      document.getElementById("section-run").style.display = section === "run" ? "block" : "none";
+
+      document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+      if (section === "home") {
+        document.querySelector(".nav-item").classList.add("active");
+        loadProjects();
+      }
+    }
+
+    function openModal(id) {
+      document.getElementById(id).style.display = "flex";
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = "none";
+    }
+
+    // Projects CRUD
+    async function loadProjects() {
+      try {
+        const response = await fetch(`${API_BASE}/projects`);
+        const projects = await response.json();
+        
+        // Sidebar list
+        const sidebarList = document.getElementById("sidebar-projects-list");
+        sidebarList.innerHTML = "";
+        
+        // Grid list
+        const grid = document.getElementById("projects-grid");
+        grid.innerHTML = "";
+
+        // Counters
+        document.getElementById("stat-projects").innerText = projects.length;
+
+        let totalRuns = 0;
+        let cumulativeCost = 0.0;
+
+        for (const p of projects) {
+          // Add to sidebar
+          const sidebarEl = document.createElement("div");
+          sidebarEl.className = "nav-item";
+          sidebarEl.innerHTML = `<i data-lucide="folder"></i><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${p.name}</span>`;
+          sidebarEl.onclick = () => selectProject(p.id);
+          sidebarList.appendChild(sidebarEl);
+
+          // Get runs to add stats
+          const rResp = await fetch(`${API_BASE}/projects/${p.id}/runs`);
+          const runs = await rResp.json();
+          totalRuns += runs.length;
+
+          const completedRuns = runs.filter(r => r.status === "COMPLETED");
+          const projectCost = completedRuns.reduce((sum, r) => sum + (r.summary_stats?.total_cost || 0), 0);
+          cumulativeCost += projectCost;
+
+          // Add card
+          const card = document.createElement("div");
+          card.className = "glass-card";
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <span class="badge" style="background:rgba(59,130,246,0.12); color:var(--accent-primary)">${p.benchmark_type}</span>
+            </div>
+            <h3 style="font-size:1.15rem; margin-bottom:8px;">${p.name}</h3>
+            <p style="color:var(--text-secondary); font-size:0.85rem; min-height:36px; margin-bottom:15px;">${p.description || "No description."}</p>
+            <div style="border-top: 1px solid var(--border-color); padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.75rem; color:var(--text-muted)">${runs.length} Runs</span>
+              <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="selectProject('${p.id}')">Open Workspace</button>
+            </div>
+          `;
+          grid.appendChild(card);
+        }
+
+        document.getElementById("stat-runs").innerText = totalRuns;
+        document.getElementById("stat-cost").innerText = `$${cumulativeCost.toFixed(4)}`;
+        lucide.createIcons();
+
+      } catch (err) {
+        console.error("Error loading projects:", err);
+      }
+    }
+
+    // Create Project
+    document.getElementById("create-project-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("new-proj-name").value;
+      const description = document.getElementById("new-proj-desc").value;
+      const benchmark_type = document.getElementById("new-proj-type").value;
+
+      try {
+        const response = await fetch(`${API_BASE}/projects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description, benchmark_type })
+        });
+        if (response.ok) {
+          closeModal("create-project-modal");
+          loadProjects();
+          document.getElementById("create-project-form").reset();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    // View Project Workspace
+    async function selectProject(projectId) {
+      currentProjectId = projectId;
+      showSection("project");
+      
+      try {
+        const response = await fetch(`${API_BASE}/projects/${projectId}`);
+        const proj = await response.json();
+        currentProject = proj;
+
+        document.getElementById("project-title").innerText = proj.name;
+        document.getElementById("project-desc").innerText = proj.description || "No description provided.";
+        document.getElementById("project-type-badge").innerText = `${proj.benchmark_type} Evaluation`;
+        
+        document.getElementById("btn-delete-project").onclick = () => deleteProject(projectId);
+
+        loadProjectWorkspaceRuns();
+        loadDriftChart();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadProjectWorkspaceRuns() {
+      try {
+        const response = await fetch(`${API_BASE}/projects/${currentProjectId}/runs`);
+        const runs = await response.json();
+        
+        const tableBody = document.getElementById("project-runs-table");
+        tableBody.innerHTML = "";
+
+        if (runs.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No evaluation runs triggered.</td></tr>`;
+          return;
+        }
+
+        runs.forEach(run => {
+          const dateStr = new Date(run.created_at).toLocaleString();
+          const stats = run.summary_stats || {};
+          const successStr = stats.success_rate !== undefined ? `${(stats.success_rate * 100).toFixed(0)}%` : "-";
+          const latencyStr = stats.avg_latency !== undefined ? `${stats.avg_latency.toFixed(2)}s` : "-";
+          const costStr = stats.total_cost !== undefined ? `$${stats.total_cost.toFixed(4)}` : "-";
+
+          let actionBtn = "";
+          if (run.status === "COMPLETED") {
+            actionBtn = `<button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem" onclick="viewRunDetails('${run.id}')">Analyze</button>`;
+          } else if (run.status === "FAILED") {
+            actionBtn = `<span style="color:var(--color-danger); font-size:0.8rem" title="${run.error_message}">Failed</span>`;
+          } else {
+            actionBtn = `<span class="spinning" style="display:inline-block; width:12px; height:12px; border:2px solid var(--border-color); border-top-color:var(--accent-primary); border-radius:50%"></span>`;
+          }
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td style="font-weight:600">${run.model_config.model_name}</td>
+            <td><span class="badge badge-${run.status.toLowerCase()}">${run.status}</span></td>
+            <td>${successStr}</td>
+            <td>${latencyStr}</td>
+            <td>${costStr}</td>
+            <td>${actionBtn}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Delete Project
+    async function deleteProject(id) {
+      if (!confirm("Are you sure you want to delete this project and all its benchmarks?")) return;
+      try {
+        await fetch(`${API_BASE}/projects/${id}`, { method: "DELETE" });
+        showSection("home");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Trigger Run
+    document.getElementById("run-trigger-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const model_name = document.getElementById("run-model").value;
+      const temperature = parseFloat(document.getElementById("run-temp").value);
+      const system_prompt = document.getElementById("run-prompt").value;
+
+      try {
+        const response = await fetch(`${API_BASE}/projects/${currentProjectId}/runs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model_config: { model_name, temperature, system_prompt }
+          })
+        });
+        if (response.ok) {
+          alert("Benchmark evaluation runs started in the background!");
+          loadProjectWorkspaceRuns();
+        } else {
+          const detail = await response.json();
+          alert(`Error: ${detail.detail || "Could not trigger evaluation."}`);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    // Bulk upload test cases
+    document.getElementById("upload-cases-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const rawJson = document.getElementById("upload-json-input").value;
+      let parsed;
+      try {
+        parsed = JSON.parse(rawJson);
+      } catch (jsonErr) {
+        alert(`Invalid JSON format: ${jsonErr.message}`);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/projects/${currentProjectId}/testcases/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed)
+        });
+        if (response.ok) {
+          alert("Test cases imported successfully!");
+          closeModal("upload-cases-modal");
+          document.getElementById("upload-json-input").value = "";
+          // Reload project detail counters
+          selectProject(currentProjectId);
+        } else {
+          const detail = await response.json();
+          alert(`Import failed: ${detail.detail || "Server error"}`);
+        }
+      } catch (networkErr) {
+        alert(`Network connection failed! Make sure your FastAPI backend server is running. Error: ${networkErr.message}`);
+      }
+    };
+
+    // Load Drift Trend Line Chart (Chart.js)
+    async function loadDriftChart() {
+      try {
+        const response = await fetch(`${API_BASE}/projects/${currentProjectId}/drift`);
+        const drift = await response.json();
+
+        if (chartInstance) {
+          chartInstance.destroy();
+        }
+
+        if (drift.length < 2) {
+          document.getElementById("chart-wrapper").innerHTML = `
+            <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px dashed var(--border-color); border-radius:12px; padding:20px; color:var(--text-muted); font-size:0.85rem">
+              <i data-lucide="info" style="margin-bottom:8px;"></i>
+              <span>Need at least 2 completed runs to trace drift timelines.</span>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        // Re-inject canvas
+        document.getElementById("chart-wrapper").innerHTML = `<canvas id="driftChart"></canvas>`;
+
+        const labels = drift.map(d => new Date(d.created_at).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric'}));
+        const metricKeys = Object.keys(drift[0].avg_scores);
+        
+        const datasets = metricKeys.map((metric, i) => {
+          const colors = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
+          const color = colors[i % colors.length];
+          return {
+            label: metric.replace("_", " ").toUpperCase(),
+            data: drift.map(d => (d.avg_scores[metric] || 0) * 100),
+            borderColor: color,
+            backgroundColor: color + "1A", // translucency
+            tension: 0.2,
+            borderWidth: 2.5
+          };
+        });
+
+        const ctx = document.getElementById('driftChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                min: 0, max: 100,
+                grid: { color: "rgba(255,255,255,0.03)" },
+                ticks: { color: "#64748b" }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: "#64748b", font: { size: 9 } }
+              }
+            },
+            plugins: {
+              legend: {
+                labels: { color: "#94a3b8", font: { family: "Inter" } }
+              }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // View Run Details Screen
+    async function viewRunDetails(runId) {
+      showSection("run");
+      try {
+        const rResp = await fetch(`${API_BASE}/runs/${runId}`);
+        const run = await rResp.json();
+        
+        const pResp = await fetch(`${API_BASE}/projects/${run.project_id}`);
+        const project = await pResp.json();
+
+        document.getElementById("run-details-header").innerHTML = `Evaluating model <strong>${run.model_config.model_name}</strong> executed on ${new Date(run.created_at).toLocaleString()}`;
+        
+        // stats
+        const stats = run.summary_stats || {};
+        const statsGrid = document.getElementById("run-stats-grid");
+        statsGrid.innerHTML = `
+          <div class="glass-card" style="margin-bottom:0; padding:15px">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Token Cost</span>
+            <h3 style="font-size:1.6rem; color:var(--color-success); margin-top:5px;">$${stats.total_cost?.toFixed(5) || "0.00"}</h3>
+          </div>
+          <div class="glass-card" style="margin-bottom:0; padding:15px">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Latency</span>
+            <h3 style="font-size:1.6rem; margin-top:5px;">${stats.avg_latency?.toFixed(2) || "0.00"}s</h3>
+          </div>
+        `;
+        
+        if (stats.avg_scores) {
+          Object.entries(stats.avg_scores).forEach(([metric, val]) => {
+            const card = document.createElement("div");
+            card.className = "glass-card";
+            card.style.marginBottom = "0";
+            card.style.padding = "15px";
+            card.innerHTML = `
+              <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">${metric.replace("_", " ")}</span>
+              <h3 style="font-size:1.6rem; color:var(--accent-primary); margin-top:5px;">${(val * 100).toFixed(1)}%</h3>
+            `;
+            statsGrid.appendChild(card);
+          });
+        }
+
+        // Regressions
+        const regResp = await fetch(`${API_BASE}/projects/${project.id}/regressions?run_id=${runId}`);
+        const regressions = await regResp.json();
+        
+        const regSection = document.getElementById("run-regressions-section");
+        const regList = document.getElementById("run-regressions-list");
+        regList.innerHTML = "";
+
+        if (regressions.length > 0) {
+          regSection.style.display = "block";
+          regressions.forEach(r => {
+            const alert = document.createElement("div");
+            alert.style.cssText = "background:rgba(10,15,30,0.8); border:1px solid rgba(239,68,68,0.2); padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;";
+            alert.innerHTML = `
+              <div>
+                <span style="font-size:0.75rem; color:var(--text-muted)">METRIC: <strong style="color:var(--accent-secondary)">${r.metric_name.toUpperCase()}</strong></span>
+                <p style="margin-top:4px; font-size:0.9rem;">&ldquo;${r.input_query}&rdquo;</p>
+              </div>
+              <div style="text-align:right">
+                <span style="font-size:0.85rem; color:var(--text-secondary)">${r.previous_score * 100}% &rarr; <strong style="color:var(--color-danger)">${r.current_score * 100}%</strong></span>
+                <span style="display:inline-block; background:var(--color-danger-bg); color:var(--color-danger); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700; margin-left:10px;">-${r.drop_percentage}%</span>
+              </div>
+            `;
+            regList.appendChild(alert);
+          });
+        } else {
+          regSection.style.display = "none";
+        }
+
+        // Results log explorer
+        const resResp = await fetch(`${API_BASE}/runs/${runId}/results`);
+        const results = await resResp.json();
+
+        const resultsList = document.getElementById("run-results-list");
+        resultsList.innerHTML = "";
+
+        results.forEach(res => {
+          const hasError = !!res.error_message;
+          const scoreBadges = Object.entries(res.metric_scores || {}).map(([m, val]) => 
+            `<span style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.15); color:var(--accent-primary); padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:600; margin-left:6px">${m.replace("_"," ")}: ${val.toFixed(2)}</span>`
+          ).join("");
+
+          const row = document.createElement("div");
+          row.style.cssText = "border:1px solid var(--border-color); border-radius:10px; overflow:hidden; margin-bottom:10px;";
+          row.innerHTML = `
+            <div style="padding:14px 20px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleDetails('${res.id}')">
+              <span style="font-weight:600; font-size:0.92rem; display:flex; align-items:center; gap:8px">
+                <i data-lucide="${hasError ? 'x-circle' : 'check-circle-2'}" style="color:${hasError ? 'var(--color-danger)' : 'var(--color-success)'}; width:16px; height:16px;"></i>
+                ${res.test_case?.input_query || "TestCase Query"}
+              </span>
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:0.8rem; color:var(--text-muted)">${res.latency_seconds?.toFixed(2)}s</span>
+                ${scoreBadges}
+              </div>
+            </div>
+            
+            <div id="details-${res.id}" class="result-details">
+              ${hasError ? `
+                <div style="color:var(--color-danger); font-size:0.8rem; font-weight:600;">ERROR LOG:</div>
+                <pre style="background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.15); color:#fca5a5; padding:10px; border-radius:6px; margin-top:5px; font-family:monospace; overflow-x:auto;">${res.error_message}</pre>
+              ` : `
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:5px;">
+                  <div>
+                    <span style="color:var(--text-muted); font-size:0.75rem; font-weight:600; text-transform:uppercase;">Reference Expected Output:</span>
+                    <pre style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); padding:10px; border-radius:6px; font-family:sans-serif; white-space:pre-wrap; margin-top:4px; max-height:200px; overflow-y:auto;">${res.test_case?.expected_output || "No expected output baseline defined."}</pre>
+                  </div>
+                  <div>
+                    <span style="color:var(--text-muted); font-size:0.75rem; font-weight:600; text-transform:uppercase;">Model Generated Output:</span>
+                    <pre style="background:rgba(59,130,246,0.03); border:1px solid rgba(59,130,246,0.15); padding:10px; border-radius:6px; font-family:sans-serif; color:white; white-space:pre-wrap; margin-top:4px; max-height:200px; overflow-y:auto;">${res.generated_output}</pre>
+                  </div>
+                  ${res.test_case?.context_references && res.test_case.context_references.length > 0 ? `
+                    <div style="grid-column: span 2; margin-top:10px;">
+                      <span style="color:var(--text-muted); font-size:0.75rem; font-weight:600; text-transform:uppercase;">Retrieved Context (RAG):</span>
+                      <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+                        ${res.test_case.context_references.map((doc, idx) => `
+                          <div style="background:rgba(255,255,255,0.01); border:1px solid var(--border-color); padding:8px; border-radius:6px; font-size:0.85rem; color:var(--text-secondary);"><strong>[Doc ${idx+1}]</strong> ${doc}</div>
+                        `).join("")}
+                      </div>
+                    </div>
+                  ` : ""}
+                </div>
+              `}
+            </div>
+          `;
+          resultsList.appendChild(row);
+        });
+        
+        lucide.createIcons();
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function toggleDetails(id) {
+      const detailsEl = document.getElementById(`details-${id}`);
+      detailsEl.style.display = detailsEl.style.display === "block" ? "none" : "block";
+    }
+
+    function goBackToProject() {
+      selectProject(currentProjectId);
+    }
+  </script>
+</body>
+</html>
